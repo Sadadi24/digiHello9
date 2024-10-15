@@ -2,14 +2,21 @@ package com.digi.digiHello9.controller;
 
 
 import com.digi.digiHello9.dto.VilleDto;
+import com.digi.digiHello9.exception.CustomException;
+
+import com.digi.digiHello9.services.DepartementApiService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.servlet.http.HttpServletResponse;
+import org.attoparser.dom.Document;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +29,9 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -31,11 +41,13 @@ public class VilleController {
   
    @Autowired
    private VilleServices villeServices;
+    @Autowired
+    private DepartementApiService departementApiService;
 
 
 
    // Méthode GET pour récupérer la liste des villes
-   @GetMapping("/villes")
+   @GetMapping("/api")
    @Operation(
            summary = "Liste des villes",
            description = "Récupère la liste complète des villes disponibles"
@@ -55,7 +67,7 @@ public class VilleController {
                    content = @Content
            )
    })
-   public Stream<VilleDto> getVilles() {
+   public Stream<VilleDto> getVilles() throws CustomException {
        return villeServices.extractVilles();
    }
     @Operation(
@@ -80,15 +92,15 @@ public class VilleController {
                     )
             )
     })
-   @GetMapping("/ville/{id}")
+   @GetMapping("/api/ville/{id}")
    public ResponseEntity<Ville> getVilleById(@PathVariable Long id) {
 	   try {
            return ResponseEntity.ok(villeServices.extractVille(id));
-       } catch (EntityNotFoundException e) {
+       } catch (EntityNotFoundException | CustomException e) {
            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
            }
-       
-   
+
+
    }
     @Operation(
             summary = "Rechercher une ville par nom",
@@ -112,7 +124,7 @@ public class VilleController {
                     )
             )
     })
-    @GetMapping("/ville/{nom}")
+    @GetMapping("/api/ville/{nom}")
     public ResponseEntity<Ville> getVilleByNom(@PathVariable String nom) {
         try {
             Ville ville = villeServices.extractVille(nom);
@@ -120,7 +132,7 @@ public class VilleController {
                 return ResponseEntity.ok(ville);
             }
 
-        } catch (EntityNotFoundException e) {
+        } catch (EntityNotFoundException | CustomException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
 
@@ -130,7 +142,7 @@ public class VilleController {
 
 
 
-    @PutMapping("/ville/update/{id}")
+    @PutMapping("/api/ville/update/{id}")
     @Operation(
             summary = "Mettre à jour une ville",
             description = "Met à jour les informations d'une ville existante à partir de son ID"
@@ -161,7 +173,7 @@ public class VilleController {
                     )
             )
     })
-    public ResponseEntity<Ville> updateVille(@PathVariable Long id, @RequestBody @Valid Ville newVille) {
+    public ResponseEntity<Ville> updateVille(@PathVariable Long id, @RequestBody @Valid Ville newVille) throws CustomException {
         Ville ville = villeServices.extractVille(id);
         if (ville == null) {
             return ResponseEntity.notFound().build();
@@ -198,9 +210,9 @@ public class VilleController {
                     )
             )
     })
-   @PostMapping("ville/add")
-   public  ResponseEntity<Stream<VilleDto>>  insertVille(@RequestBody @Valid Ville ville) {
-	   return new ResponseEntity<>(villeServices.insertVille(ville), HttpStatus.CREATED);
+   @PostMapping("/api/ville/add")
+   public  ResponseEntity<VilleDto>  insertVille(@RequestBody @Valid Ville ville) throws CustomException {
+	   return villeServices.insertVille(ville);
 	}
 
 
@@ -226,16 +238,19 @@ public class VilleController {
                     )
             )
     })
-   @DeleteMapping("/ville/delete/{id}")
-   public ResponseEntity<Stream<VilleDto>> deleteVilleById(@PathVariable Long id) {
-	   return ResponseEntity.ok(villeServices.supprimerVille(id));
+   @DeleteMapping("/api/ville/delete/{id}")
+   public ResponseEntity<String> deleteVilleById(@PathVariable Long id) {
+	   return villeServices.supprimerVille(id);
  
    }
-   
-   
-   
-   
+
+
 }
+   
+   
+   
+   
+
 
 
 

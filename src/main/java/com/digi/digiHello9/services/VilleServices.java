@@ -1,26 +1,17 @@
 package com.digi.digiHello9.services;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.digi.digiHello9.dto.VilleDto;
+import com.digi.digiHello9.exception.CustomException;
 import com.digi.digiHello9.mapper.VilleMapper;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.ErrorResponse;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import com.digi.digiHello9.dao.VilleDao;
-import com.digi.digiHello9.model.Departement;
 import com.digi.digiHello9.model.Ville;
 import com.digi.digiHello9.repository.VilleRepository;
 
@@ -36,98 +27,69 @@ public class VilleServices {
     @Autowired
     private VilleMapper villeMapper;
 
-
-    @Operation(
-            summary = "Liste des villes",
-            description = "Récupère la liste complète des villes disponibles"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Retourne la liste des villes",
-                    content = @Content(
-                            mediaType = "application/json",
-                            array = @ArraySchema(schema = @Schema(implementation = VilleDto.class))
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Si une règle métier n'est pas respectée",
-                    content = @Content
-            )
-    })
-    public Stream<VilleDto> extractVilles() {
-         return villeRepository.findAll().stream().map(ville ->villeMapper.toDto(ville));
-    }
+    private Map<String, List<Ville>> villesParDepartement = new HashMap<>();
 
 
-    @Operation(
-            summary = "Rechercher une ville par ID",
-            description = "Récupère les détails d'une ville à partir de son identifiant"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Ville trouvée",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = Ville.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Ville non trouvée",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
-                    )
-            )
-    })
-    public Ville extractVille(Long idVille) {
+    public Ville extractVille(Long idVille) throws CustomException {
         return villeRepository.findById(idVille)
-                .orElseThrow(() -> new RuntimeException("Ville non trouvée avec l'id : " + idVille));
+                .orElseThrow(() -> new CustomException("Ville non trouvée avec l'id " ));
     }
 
-    @Operation(
-            summary = "Rechercher une ville par nom",
-            description = "Récupère les détails d'une ville à partir de son nom"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Ville trouvée",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = Ville.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Ville non trouvée",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ErrorResponse.class)
-                    )
-            )
-    })
-    public Ville extractVille(String nom) {
+
+    public Ville extractVille(String nom) throws CustomException {
+        List<Ville> resultat = new ArrayList<>();
+        for (List<Ville> villes : villesParDepartement.values()) {
+            for (Ville v : villes) {
+                if (v.getNom().toLowerCase().startsWith(nom.toLowerCase())) {
+                    resultat.add(v);
+                }
+            }
+        }
+        if (resultat.isEmpty()) {
+            throw new CustomException("Aucune ville dont le nom commence par " + nom + " n'a été trouvée");
+        }
+
         return villeRepository.findByNom(nom)
                 .orElseThrow(() -> new RuntimeException("Ville non trouvée avec le nom : " + nom));
     }
 
     @Transactional
-    public Stream<VilleDto> insertVille(@RequestBody Ville nvVille) {
+    public ResponseEntity<VilleDto> insertVille(@RequestBody Ville nvVille) throws CustomException {
+
+        validerVille(nvVille);
+
+        String cle = nvVille.getDepartement().getCode() + "-" + nvVille.getNom();
+        List<Ville> villes = villesParDepartement.getOrDefault(nvVille.getDepartement().getCode(), new ArrayList<>());
+
+        if (villes.stream().anyMatch(v -> v.getNom().equals(nvVille.getNom()))) {
+            throw new CustomException("Une ville avec ce nom existe déjà dans ce département");
+        }
         villeRepository.save(nvVille);
-        return extractVilles();
+        return ResponseEntity.ok(villeMapper.toDto(nvVille));
 
     }
 
 
     @Transactional
-    public Stream<VilleDto> supprimerVille(Long idVille) {
+    public  ResponseEntity<String> supprimerVille(Long idVille) {
         villeRepository.deleteById(idVille);
-        return extractVilles();
+        return ResponseEntity.ok(idVille.toString());
 
     }
 
+    public Stream<VilleDto> extractVilles() throws CustomException {
+        return villeRepository.findAll().stream().map(villeMapper::toDto);
+    }
+
+    private void validerVille(Ville ville) throws CustomException {
+        if (ville.getNbHabitants()< 10) {
+            throw new CustomException("La ville doit avoir au moins 10 habitants");
+        }
+        if (ville.getNom().length() < 2) {
+            throw new CustomException("Le nom de la ville doit contenir au moins 2 lettres");
+        }
+        if (ville.getDepartement().getCode() == null || ville.getDepartement().getCode().length() != 2) {
+            throw new CustomException("Le code département doit obligatoirement avoir 2 caractères");
+        }
+    }
 }

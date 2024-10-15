@@ -4,16 +4,16 @@ public class VilleDto {
     private String codeVille;
     private int nombreHabitants;
     private String codeDepartement;
-    private String nomDepartement;
+    private String nomVille;
 
     // Constructeurs
     public VilleDto() {}
 
-    public VilleDto(String codeVille, int nombreHabitants, String codeDepartement, String nomDepartement) {
+    public VilleDto(String codeVille, int nombreHabitants, String codeDepartement, String nomVille) {
         this.codeVille = codeVille;
         this.nombreHabitants = nombreHabitants;
         this.codeDepartement = codeDepartement;
-        this.nomDepartement = nomDepartement;
+        this.nomVille = nomVille;
     }
 
     // Getters et Setters
@@ -41,12 +41,12 @@ public class VilleDto {
         this.codeDepartement = codeDepartement;
     }
 
-    public String getNomDepartement() {
-        return nomDepartement;
+    public String getNomVille() {
+        return nomVille;
     }
 
-    public void setNomDepartement(String nomDepartement) {
-        this.nomDepartement = nomDepartement;
+    public void setNomVille(String nomVille) {
+        this.nomVille = nomVille;
     }
 }
 
